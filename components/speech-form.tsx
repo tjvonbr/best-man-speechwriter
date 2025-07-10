@@ -10,7 +10,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { ProgressSteps } from '@/components/progress-steps';
 
 interface FormData {
-  name: string;
+  firstName: string;
+  lastName: string;
+  email: string;
   sex: 'male' | 'female' | '';
   speechType: string;
   groomName: string;
@@ -22,7 +24,8 @@ interface FormData {
 }
 
 interface SpeechFormProps {
-  onGenerateSpeech: (data: FormData) => void;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  onGenerateSpeech: (data: any) => void;
   isLoading: boolean;
   error: string;
 }
@@ -54,7 +57,9 @@ const colorSchemes = {
 export function SpeechForm({ onGenerateSpeech, isLoading, error }: SpeechFormProps) {
   const [currentStep, setCurrentStep] = useState(1);
   const [formData, setFormData] = useState<FormData>({
-    name: '',
+    firstName: '',
+    lastName: '',
+    email: '',
     sex: '',
     speechType: 'Best Man',
     groomName: '',
@@ -74,7 +79,6 @@ export function SpeechForm({ onGenerateSpeech, isLoading, error }: SpeechFormPro
         [name]: value,
       };
       
-      // Update speech type based on sex selection
       if (name === 'sex') {
         if (value === 'male') {
           newData.speechType = 'Best Man';
@@ -88,7 +92,7 @@ export function SpeechForm({ onGenerateSpeech, isLoading, error }: SpeechFormPro
   };
 
   const nextStep = () => {
-    if (currentStep === 1 && (!formData.name || !formData.sex)) {
+    if (currentStep === 1 && (!formData.firstName || !formData.lastName || !formData.email || !formData.sex)) {
       return;
     }
     setCurrentStep(prev => prev + 1);
@@ -102,7 +106,13 @@ export function SpeechForm({ onGenerateSpeech, isLoading, error }: SpeechFormPro
     if (!formData.groomName || !formData.brideName || !formData.relationship) {
       return;
     }
-    onGenerateSpeech(formData);
+
+    // Combine first and last name for the API
+    const formDataWithName = {
+      ...formData,
+      name: `${formData.firstName} ${formData.lastName}`.trim(),
+    };
+    onGenerateSpeech(formDataWithName);
   };
 
   const renderStep1 = () => (
@@ -114,18 +124,37 @@ export function SpeechForm({ onGenerateSpeech, isLoading, error }: SpeechFormPro
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="firstName">First Name</Label>
+            <Input
+              id="firstName"
+              value={formData.firstName}
+              onChange={(e) => handleInputChange('firstName', e.target.value)}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="lastName">Last Name</Label>
+            <Input
+              id="lastName"
+              value={formData.lastName}
+              onChange={(e) => handleInputChange('lastName', e.target.value)}
+            />
+          </div>
+        </div>
+        
         <div className="space-y-2">
-          <Label htmlFor="name">Your Name</Label>
+          <Label htmlFor="email">Email</Label>
           <Input
-            id="name"
-            value={formData.name}
-            onChange={(e) => handleInputChange('name', e.target.value)}
-            placeholder="Enter your name"
+            id="email"
+            type="email"
+            value={formData.email}
+            onChange={(e) => handleInputChange('email', e.target.value)}
           />
         </div>
         
         <div className="space-y-2">
-          <Label htmlFor="sex">Your Sex</Label>
+          <Label htmlFor="sex">Sex</Label>
           <Select value={formData.sex} onValueChange={(value) => handleInputChange('sex', value)}>
             <SelectTrigger>
               <SelectValue placeholder="Select your sex" />
@@ -139,7 +168,7 @@ export function SpeechForm({ onGenerateSpeech, isLoading, error }: SpeechFormPro
 
         <Button 
           onClick={nextStep}
-          disabled={!formData.name || !formData.sex}
+          disabled={!formData.firstName || !formData.lastName || !formData.email || !formData.sex}
           className={`w-full text-white font-semibold py-3 ${colors.button}`}
         >
           Continue

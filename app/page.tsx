@@ -1,11 +1,13 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { SpeechForm } from '@/components/speech-form';
 
-interface FormData {
+interface ApiFormData {
   name: string;
   sex: 'male' | 'female' | '';
+  email: string;
   speechType: string;
   groomName: string;
   brideName: string;
@@ -16,14 +18,13 @@ interface FormData {
 }
 
 export default function Home() {
-  const [generatedSpeech, setGeneratedSpeech] = useState('');
+  const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const generateSpeech = async (formData: FormData) => {
+  const generateSpeech = async (formData: ApiFormData) => {
     setIsLoading(true);
     setError('');
-    setGeneratedSpeech('');
 
     try {
       const response = await fetch('/api/generate-speech', {
@@ -40,10 +41,10 @@ export default function Home() {
         throw new Error(data.error || 'Failed to generate speech');
       }
 
-      setGeneratedSpeech(data.speech);
+      // Redirect to the speeches page using the ID
+      router.push(`/speeches/${data.speechId}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to generate speech');
-    } finally {
       setIsLoading(false);
     }
   };
@@ -71,25 +72,7 @@ export default function Home() {
             />
           </div>
 
-          {/* Generated Speech Display */}
-          {generatedSpeech && (
-            <div className="mt-8 bg-white rounded-lg shadow-lg p-6">
-              <h2 className="text-2xl font-semibold text-gray-900 mb-4">
-                Your Generated Speech
-              </h2>
-              <div className="bg-gray-50 rounded-lg p-4 max-h-96 overflow-y-auto">
-                <div className="whitespace-pre-wrap text-gray-800 leading-relaxed">
-                  {generatedSpeech}
-                </div>
-              </div>
-              <button
-                onClick={() => navigator.clipboard.writeText(generatedSpeech)}
-                className="mt-4 w-full bg-gray-600 text-white font-semibold py-3 px-6 rounded-lg hover:bg-gray-700 transition-colors duration-200"
-              >
-                Copy to Clipboard
-              </button>
-            </div>
-          )}
+
         </div>
       </div>
     </div>
