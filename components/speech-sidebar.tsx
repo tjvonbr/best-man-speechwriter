@@ -2,8 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 
 interface Speech {
@@ -21,7 +19,6 @@ interface SpeechSidebarProps {
 export function SpeechSidebar({ userId }: SpeechSidebarProps) {
   const [speeches, setSpeeches] = useState<Speech[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const pathname = usePathname();
 
   useEffect(() => {
     const fetchSpeeches = async () => {
@@ -77,26 +74,8 @@ export function SpeechSidebar({ userId }: SpeechSidebarProps) {
           </div>
         ) : (
           speeches.map((speech) => (
-            <Link key={speech.id} href={`/speeches/${speech.id}`}>
-              <Card 
-                className={`cursor-pointer transition-all hover:shadow-md ${
-                  pathname === `/speeches/${speech.id}` 
-                    ? 'ring-2 ring-blue-500 bg-blue-50' 
-                    : 'hover:bg-gray-50'
-                }`}
-              >
-                <CardContent className="p-4">
-                  <div className="text-sm font-medium text-gray-900 mb-1">
-                    {speech.speechType}
-                  </div>
-                  <div className="text-xs text-gray-600 mb-2">
-                    {speech.groomName} & {speech.brideName}
-                  </div>
-                  <div className="text-xs text-gray-500">
-                    {new Date(speech.createdAt).toLocaleDateString()}
-                  </div>
-                </CardContent>
-              </Card>
+            <Link key={speech.id} href={`/speeches/${speech.id}`} className="group flex items-center rounded-md px-3 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground">
+              <span className="truncate">{speech.speechType} | {speech.groomName} x {speech.brideName}</span>
             </Link>
           ))
         )}
