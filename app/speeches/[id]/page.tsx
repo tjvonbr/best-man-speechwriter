@@ -1,8 +1,28 @@
-import { prisma } from '@/lib/prisma';
+'use client';
+
+import { useState, useEffect } from 'react';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { SpeechSidebar } from '@/components/speech-sidebar';
 import { CopyButton } from '@/components/copy-button';
+import { ChatDialog } from '@/components/chat-dialog';
+
+interface Speech {
+  id: string;
+  speechType: string;
+  groomName: string;
+  brideName: string;
+  relationship: string;
+  tone: string;
+  length: string;
+  speech: string;
+  createdAt: string;
+  user: {
+    firstName: string;
+    lastName: string;
+  };
+  userId: string;
+}
 
 interface SpeechPageProps {
   params: {
@@ -10,11 +30,140 @@ interface SpeechPageProps {
   };
 }
 
-export default async function SpeechPage({ params }: SpeechPageProps) {
-  const speech = await prisma.speech.findUnique({
-    where: { id: params.id },
-    include: { user: true },
-  });
+export default function SpeechPage({ params }: SpeechPageProps) {
+  const [speech, setSpeech] = useState<Speech | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [selectedText, setSelectedText] = useState('');
+  const [dialogPosition, setDialogPosition] = useState<{ x: number; y: number } | null>(null);
+
+  useEffect(() => {
+    const fetchSpeech = async () => {
+      try {
+        const response = await fetch(`/api/speeches/${params.id}`);
+        if (!response.ok) {
+          notFound();
+        }
+        const data = await response.json();
+        setSpeech(data.speech);
+      } catch (error) {
+        console.error('Error fetching speech:', error);
+        notFound();
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchSpeech();
+  }, [params.id]);
+
+  const handleTextSelection = () => {
+    const selection = window.getSelection();
+    if (selection && selection.toString().trim()) {
+      const selectedText = selection.toString().trim();
+      setSelectedText(selectedText);
+      
+      // Get the position of the selection
+      const range = selection.getRangeAt(0);
+      const rect = range.getBoundingClientRect();
+      setDialogPosition({
+        x: rect.left + rect.width / 2,
+        y: rect.bottom + window.scrollY + 10,
+      });
+    }
+  };
+
+  const handleSendMessage = async (message: string, selectedText: string): Promise<string> => {
+    if (!speech) return 'Error: Speech not found';
+
+    const speechContext = `
+Speech Type: ${speech.speechType}
+Groom: ${speech.groomName}
+Bride: ${speech.brideName}
+Relationship: ${speech.relationship}
+Tone: ${speech.tone}
+Length: ${speech.length}
+Full Speech: ${speech.speech}
+    `.trim();
+
+    try {
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          message,
+          selectedText,
+          speechContext,
+          mode: 'chat',
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to send message');
+      }
+
+      return data.response;
+    } catch (error) {
+      console.error('Error sending message:', error);
+      return 'Sorry, there was an error processing your request.';
+    }
+  };
+
+  const handleRewrite = async (instructions: string, selectedText: string): Promise<string> => {
+    if (!speech) return 'Error: Speech not found';
+
+    const speechContext = `
+Speech Type: ${speech.speechType}
+Groom: ${speech.groomName}
+Bride: ${speech.brideName}
+Relationship: ${speech.relationship}
+Tone: ${speech.tone}
+Length: ${speech.length}
+Full Speech: ${speech.speech}
+    `.trim();
+
+    try {
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          message: instructions,
+          selectedText,
+          speechContext,
+          mode: 'rewrite',
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to rewrite text');
+      }
+
+      return data.response;
+    } catch (error) {
+      console.error('Error rewriting text:', error);
+      return 'Sorry, there was an error rewriting the text.';
+    }
+  };
+
+  const closeDialog = () => {
+    setDialogPosition(null);
+    setSelectedText('');
+  };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
 
   if (!speech) {
     notFound();
@@ -45,7 +194,11 @@ export default async function SpeechPage({ params }: SpeechPageProps) {
             {/* Speech Content */}
             <div className="bg-white rounded-lg shadow-lg p-8">
               <div className="prose prose-lg max-w-none">
-                <div className="whitespace-pre-wrap text-gray-800 leading-relaxed">
+                <div 
+                  className="whitespace-pre-wrap text-gray-800 leading-relaxed select-text cursor-text"
+                  onMouseUp={handleTextSelection}
+                  onTouchEnd={handleTextSelection}
+                >
                   {speech.speech}
                 </div>
               </div>
@@ -100,6 +253,15 @@ export default async function SpeechPage({ params }: SpeechPageProps) {
           </div>
         </div>
       </div>
+
+      {/* Chat Dialog */}
+      <ChatDialog
+        selectedText={selectedText}
+        position={dialogPosition}
+        onClose={closeDialog}
+        onSendMessage={handleSendMessage}
+        onRewrite={handleRewrite}
+      />
     </div>
   );
 } 
