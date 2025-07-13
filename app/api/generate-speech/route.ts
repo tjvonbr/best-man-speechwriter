@@ -39,7 +39,9 @@ Please create a heartfelt, personal, and engaging speech that:
 - Matches the requested tone and length
 - Feels authentic and personal, as if it's being delivered by ${fullName}
 
-Make the speech feel authentic and personal, as if it's being delivered by someone who truly knows and cares about the couple. The speech should reflect the speaker's relationship and personal connection to the couple.`;
+Make the speech feel authentic and personal, as if it's being delivered by someone who truly knows and cares about the couple. The speech should reflect the speaker's relationship and personal connection to the couple.
+
+Please only include the body of the speech--no summaries or introductions.`
 
     const message = await anthropic.messages.create({
       model: 'claude-3-5-sonnet-20241022',
