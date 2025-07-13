@@ -17,7 +17,17 @@ export function ChatDialog({ selectedText, position, onClose, onSendMessage, onR
   const [message, setMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [response, setResponse] = useState('');
+  const [isRewriting, setIsRewriting] = useState(false);
+  const [dragPosition, setDragPosition] = useState<{ x: number; y: number } | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const dialogRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (position) {
+      setDragPosition(position);
+    }
+  }, [position]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -25,12 +35,58 @@ export function ChatDialog({ selectedText, position, onClose, onSendMessage, onR
         onClose();
         setMessage('');
         setResponse('');
+        setIsRewriting(false);
       }
     };
 
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [onClose]);
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (e.target === e.currentTarget || (e.target as HTMLElement).closest('[data-draggable="true"]')) {
+      setIsDragging(true);
+      const rect = dialogRef.current?.getBoundingClientRect();
+      if (rect) {
+        setDragOffset({
+          x: e.clientX - rect.left,
+          y: e.clientY - rect.top,
+        });
+      }
+    }
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (isDragging && dragPosition) {
+        const newX = e.clientX - dragOffset.x;
+        const newY = e.clientY - dragOffset.y;
+        
+        // Keep dialog within viewport bounds
+        const maxX = window.innerWidth - 400; // dialog width
+        const maxY = window.innerHeight - 300; // approximate dialog height
+        
+        setDragPosition({
+          x: Math.max(20, Math.min(newX, maxX)),
+          y: Math.max(20, Math.min(newY, maxY)),
+        });
+      }
+    };
+
+    if (isDragging) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+      
+      return () => {
+        document.removeEventListener('mousemove', handleMouseMove);
+        document.removeEventListener('mouseup', handleMouseUp);
+      };
+    }
+  }, [isDragging, dragPosition, dragOffset]);
 
   const determineAction = (userInput: string): 'chat' | 'rewrite' => {
     const rewriteKeywords = [
@@ -47,50 +103,74 @@ export function ChatDialog({ selectedText, position, onClose, onSendMessage, onR
     if (!message.trim()) return;
 
     setIsLoading(true);
+    setIsRewriting(false);
+    setResponse('');
+    
     try {
       const action = determineAction(message);
-      const responseText = action === 'chat' 
-        ? await onSendMessage(message, selectedText)
-        : await onRewrite(message, selectedText);
-      setResponse(responseText);
+      
+      if (action === 'rewrite') {
+        setIsRewriting(true);
+        await onRewrite(message, selectedText);
+        setResponse(`✅ Text rewritten successfully!`);
+        setIsRewriting(false);
+        
+        // Close dialog after a short delay to show success
+        setTimeout(() => {
+          onClose();
+          setMessage('');
+          setResponse('');
+        }, 1500);
+      } else {
+        const responseText = await onSendMessage(message, selectedText);
+        setResponse(responseText);
+      }
     } catch (error) {
       console.error('Error processing request:', error);
       setResponse('Sorry, there was an error processing your request.');
+      setIsRewriting(false);
     } finally {
       setIsLoading(false);
     }
   };
 
-  if (!position) return null;
-
-  // Calculate if dialog should appear above or below the selection
-  const dialogHeight = 300; // Approximate height of the dialog
-  const dialogWidth = 400; // Approximate width of the dialog
-  const margin = 20; // Minimum margin from viewport edges
-  
-  const shouldRenderAbove = position.y + dialogHeight > window.innerHeight - margin;
-  
-  const dialogStyle = {
-    left: Math.max(
-      margin,
-      Math.min(position.x - dialogWidth / 2, window.innerWidth - dialogWidth - margin)
-    ),
-    top: shouldRenderAbove 
-      ? Math.max(margin, position.y - dialogHeight - 10) // Above the selection
-      : Math.min(position.y, window.innerHeight - dialogHeight - margin), // Below the selection
-  };
+  if (!dragPosition) return null;
 
   return (
     <div
       ref={dialogRef}
-      className="fixed z-50 bg-white rounded-lg shadow-xl border border-gray-200 w-xs"
-      style={dialogStyle}
+      className={`fixed z-50 bg-white rounded-lg shadow-xl border border-gray-200 w-xs ${
+        isDragging ? 'cursor-grabbing' : 'cursor-grab'
+      }`}
+      style={{
+        left: dragPosition.x,
+        top: dragPosition.y,
+        userSelect: isDragging ? 'none' : 'auto',
+      }}
+      onMouseDown={handleMouseDown}
     >
       <Card className="w-full">
-        <CardHeader>
-          <CardTitle className="text-lg">Chat with Document</CardTitle>
+        <CardHeader 
+          className="cursor-grab active:cursor-grabbing bg-gray-50 border-b border-gray-200"
+          data-draggable="true"
+        >
+          <CardTitle className="text-lg flex items-center justify-between">
+            <span>
+              {isRewriting ? 'Rewriting...' : 'Chat with Document'}
+            </span>
+            <div className="text-xs text-gray-500">Drag to move</div>
+          </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
+          {selectedText && (
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+              <div className="text-xs text-gray-500 mb-1">Selected text:</div>
+              <div className="text-sm text-gray-700 font-medium">
+                &ldquo;{selectedText.length > 100 ? selectedText.substring(0, 100) + '...' : selectedText}&rdquo;
+              </div>
+            </div>
+          )}
+          
           <div className="space-y-2">
             <Textarea
               placeholder="Ask a question or provide rewrite instructions..."
@@ -98,19 +178,24 @@ export function ChatDialog({ selectedText, position, onClose, onSendMessage, onR
               onChange={(e) => setMessage(e.target.value)}
               rows={3}
               className="resize-none"
+              disabled={isRewriting}
             />
             <Button
               onClick={handleSubmit}
-              disabled={isLoading || !message.trim()}
+              disabled={isLoading || !message.trim() || isRewriting}
               className="w-full"
             >
-              {isLoading ? 'Processing...' : 'Submit'}
+              {isLoading ? 'Processing...' : isRewriting ? 'Rewriting...' : 'Submit'}
             </Button>
           </div>
 
           {response && (
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-              <div className="text-sm text-blue-900">{response}</div>
+            <div className={`border rounded-lg p-3 ${
+              isRewriting 
+                ? 'bg-green-50 border-green-200 text-green-900' 
+                : 'bg-blue-50 border-blue-200 text-blue-900'
+            }`}>
+              <div className="text-sm">{response}</div>
             </div>
           )}
         </CardContent>

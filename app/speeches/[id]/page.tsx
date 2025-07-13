@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, use } from 'react';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { SpeechSidebar } from '@/components/speech-sidebar';
 import { CopyButton } from '@/components/copy-button';
 import { ChatDialog } from '@/components/chat-dialog';
+import { ChatPane } from '@/components/chat-pane';
 
 interface Speech {
   id: string;
@@ -25,9 +26,7 @@ interface Speech {
 }
 
 interface SpeechPageProps {
-  params: {
-    id: string;
-  };
+  params: Promise<{ id: string }>;
 }
 
 export default function SpeechPage({ params }: SpeechPageProps) {
@@ -35,16 +34,21 @@ export default function SpeechPage({ params }: SpeechPageProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [selectedText, setSelectedText] = useState('');
   const [dialogPosition, setDialogPosition] = useState<{ x: number; y: number } | null>(null);
+  const [currentSpeechText, setCurrentSpeechText] = useState('');
+  const [highlightedText, setHighlightedText] = useState<string | null>(null);
+
+  const id = use(params).id;
 
   useEffect(() => {
     const fetchSpeech = async () => {
       try {
-        const response = await fetch(`/api/speeches/${params.id}`);
+        const response = await fetch(`/api/speeches/${id}`);
         if (!response.ok) {
           notFound();
         }
         const data = await response.json();
         setSpeech(data.speech);
+        setCurrentSpeechText(data.speech.speech);
       } catch (error) {
         console.error('Error fetching speech:', error);
         notFound();
@@ -54,7 +58,7 @@ export default function SpeechPage({ params }: SpeechPageProps) {
     };
 
     fetchSpeech();
-  }, [params.id]);
+  }, [id]);
 
   const handleTextSelection = () => {
     const selection = window.getSelection();
@@ -72,6 +76,20 @@ export default function SpeechPage({ params }: SpeechPageProps) {
     }
   };
 
+  const replaceTextInSpeech = (originalText: string, newText: string) => {
+    if (!speech) return;
+    
+    const updatedSpeechText = currentSpeechText.replace(originalText, newText);
+    setCurrentSpeechText(updatedSpeechText);
+    
+    // Update the speech object as well
+    setSpeech(prev => prev ? { ...prev, speech: updatedSpeechText } : null);
+    
+    // Highlight the new text briefly
+    setHighlightedText(newText);
+    setTimeout(() => setHighlightedText(null), 3000);
+  };
+
   const handleSendMessage = async (message: string, selectedText: string): Promise<string> => {
     if (!speech) return 'Error: Speech not found';
 
@@ -82,7 +100,7 @@ Bride: ${speech.brideName}
 Relationship: ${speech.relationship}
 Tone: ${speech.tone}
 Length: ${speech.length}
-Full Speech: ${speech.speech}
+Full Speech: ${currentSpeechText}
     `.trim();
 
     try {
@@ -122,7 +140,7 @@ Bride: ${speech.brideName}
 Relationship: ${speech.relationship}
 Tone: ${speech.tone}
 Length: ${speech.length}
-Full Speech: ${speech.speech}
+Full Speech: ${currentSpeechText}
     `.trim();
 
     try {
@@ -145,6 +163,9 @@ Full Speech: ${speech.speech}
         throw new Error(data.error || 'Failed to rewrite text');
       }
 
+      // Replace the selected text with the rewritten version
+      replaceTextInSpeech(selectedText, data.response);
+      
       return data.response;
     } catch (error) {
       console.error('Error rewriting text:', error);
@@ -170,16 +191,16 @@ Full Speech: ${speech.speech}
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
-      <div className="flex">
-        {/* Sidebar */}
-        <SpeechSidebar userId={speech.userId} />
-        
-        {/* Main Content */}
-        <div className="flex-1 p-8">
+    <div className="h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex">
+      {/* Sidebar - Fixed */}
+      <SpeechSidebar userId={speech.userId} />
+      
+      {/* Main Content - Scrollable */}
+      <div className={`flex-1 flex flex-col transition-all duration-300`}>
+        {/* Header - Fixed */}
+        <div className="bg-gradient-to-br from-gray-50 to-gray-100 p-8 pb-4">
           <div className="max-w-4xl mx-auto">
-            {/* Header */}
-            <div className="text-center mb-8">
+            <div className="text-center">
               <h1 className="text-3xl font-bold text-gray-900 mb-2">
                 {speech.speechType}
               </h1>
@@ -190,22 +211,33 @@ Full Speech: ${speech.speech}
                 {speech.relationship} • {speech.tone} • {speech.length}
               </p>
             </div>
+          </div>
+        </div>
 
+        {/* Scrollable Content Area */}
+        <div className="flex-1 overflow-y-auto px-8">
+          <div className="max-w-4xl mx-auto">
             {/* Speech Content */}
-            <div className="bg-white rounded-lg shadow-lg p-8">
+            <div className="bg-white rounded-lg shadow-lg p-8 mb-8">
               <div className="prose prose-lg max-w-none">
                 <div 
                   className="whitespace-pre-wrap text-gray-800 leading-relaxed select-text cursor-text"
                   onMouseUp={handleTextSelection}
                   onTouchEnd={handleTextSelection}
-                >
-                  {speech.speech}
-                </div>
+                  dangerouslySetInnerHTML={{
+                    __html: highlightedText 
+                      ? currentSpeechText.replace(
+                          highlightedText,
+                          `<span class="bg-yellow-200 px-1 rounded transition-all duration-300">${highlightedText}</span>`
+                        )
+                      : currentSpeechText
+                  }}
+                />
               </div>
             </div>
 
             {/* Speech Details */}
-            <div className="mt-8 bg-white rounded-lg shadow-lg p-6">
+            <div className="bg-white rounded-lg shadow-lg p-6 mb-8">
               <h2 className="text-xl font-semibold text-gray-900 mb-4">
                 Speech Details
               </h2>
@@ -238,7 +270,7 @@ Full Speech: ${speech.speech}
             </div>
 
             {/* Actions */}
-            <div className="mt-8 flex gap-4 justify-center">
+            <div className="flex gap-4 justify-center pb-8">
               <Link
                 href="/"
                 className="inline-flex items-center px-6 py-3 bg-gray-600 text-white font-semibold rounded-lg hover:bg-gray-700 transition-colors duration-200"
@@ -246,7 +278,7 @@ Full Speech: ${speech.speech}
                 Create Another Speech
               </Link>
               <CopyButton
-                text={speech.speech}
+                text={currentSpeechText}
                 className="inline-flex items-center px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors duration-200"
               />
             </div>
@@ -254,7 +286,13 @@ Full Speech: ${speech.speech}
         </div>
       </div>
 
-      {/* Chat Dialog */}
+      {/* Chat Pane */}
+      <ChatPane
+        onSendMessage={handleSendMessage}
+        onRewrite={handleRewrite}
+      />
+
+      {/* Chat Dialog (for quick selections) */}
       <ChatDialog
         selectedText={selectedText}
         position={dialogPosition}
