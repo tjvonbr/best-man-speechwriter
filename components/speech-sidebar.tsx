@@ -59,7 +59,7 @@ export function SpeechSidebar({ userId }: SpeechSidebarProps) {
     <div className="w-80 bg-white border-r border-gray-200 p-6">
       <div className="mb-6">
         <h2 className="text-lg font-semibold text-gray-900 mb-2">Your Speeches</h2>
-        <Link href="/">
+        <Link href="/get-started">
           <Button className="w-full" variant="outline">
             Create New Speech
           </Button>
