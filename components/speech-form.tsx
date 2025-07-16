@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { ProgressSteps } from '@/components/progress-steps';
+import { Session } from 'next-auth';
 
 interface FormData {
   firstName: string;
@@ -28,6 +29,7 @@ interface SpeechFormProps {
   onGenerateSpeech: (data: any) => void;
   isLoading: boolean;
   error: string;
+  session: Session | null;
 }
 
 const colorSchemes = {
@@ -54,7 +56,7 @@ const colorSchemes = {
   },
 };
 
-export function SpeechForm({ onGenerateSpeech, isLoading, error }: SpeechFormProps) {
+export function SpeechForm({ onGenerateSpeech, isLoading, error, session }: SpeechFormProps) {
   const [currentStep, setCurrentStep] = useState(1);
   const [formData, setFormData] = useState<FormData>({
     firstName: '',
@@ -129,7 +131,7 @@ export function SpeechForm({ onGenerateSpeech, isLoading, error }: SpeechFormPro
             <Label htmlFor="firstName">First Name</Label>
             <Input
               id="firstName"
-              value={formData.firstName}
+              value={session?.user?.name || formData.firstName}
               onChange={(e) => handleInputChange('firstName', e.target.value)}
             />
           </div>
@@ -153,7 +155,7 @@ export function SpeechForm({ onGenerateSpeech, isLoading, error }: SpeechFormPro
           />
         </div>
         
-        <div className="space-y-2">
+        <div className="space-y-2 w-full">
           <Label htmlFor="sex">Sex</Label>
           <Select value={formData.sex} onValueChange={(value) => handleInputChange('sex', value)}>
             <SelectTrigger>
