@@ -16,6 +16,7 @@ import { cn } from "@/lib/utils";
 import { userAuthSchema } from "@/lib/validations/auth";
 import { Form } from "./ui/form";
 import { createUser } from "@/lib/actions/auth";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 
 type UserAuthFormProps = React.HTMLAttributes<HTMLDivElement>;
 
@@ -27,7 +28,7 @@ export function SignUpForm({ className, ...props }: UserAuthFormProps) {
   });
 
   const [isLoading, setIsLoading] = React.useState<boolean>(false);
-  const [isGitHubLoading, setIsGitHubLoading] = React.useState<boolean>(false);
+
   const searchParams = useSearchParams();
   const router = useRouter();
 
@@ -40,6 +41,7 @@ export function SignUpForm({ className, ...props }: UserAuthFormProps) {
       formData.append("firstName", data.firstName);
       formData.append("lastName", data.lastName);
       formData.append("email", data.email);
+      formData.append("sex", data.sex);
 
       // First create the user with server action
       const result = await createUser(formData);
@@ -91,7 +93,7 @@ export function SignUpForm({ className, ...props }: UserAuthFormProps) {
                     autoCapitalize="none"
                     autoComplete="firstName"
                     autoCorrect="off"
-                    disabled={isLoading || isGitHubLoading}
+                    disabled={isLoading}
                     {...form.register("firstName")}
                   />
                   {form.formState.errors?.firstName && (
@@ -110,7 +112,7 @@ export function SignUpForm({ className, ...props }: UserAuthFormProps) {
                     autoCapitalize="none"
                     autoComplete="lastName"
                     autoCorrect="off"
-                    disabled={isLoading || isGitHubLoading}
+                    disabled={isLoading}
                     {...form.register("lastName")}
                   />
                   {form.formState.errors?.lastName && (
@@ -120,7 +122,8 @@ export function SignUpForm({ className, ...props }: UserAuthFormProps) {
                   )}
                 </div>
               </div>
-              <div className="grid gap-1">
+              <div className="grid gap-2">
+                <div className="grid gap-1">
                 <Label htmlFor="email">Email</Label>
                 <Input
                   id="email"
@@ -129,7 +132,7 @@ export function SignUpForm({ className, ...props }: UserAuthFormProps) {
                   autoCapitalize="none"
                   autoComplete="email"
                   autoCorrect="off"
-                  disabled={isLoading || isGitHubLoading}
+                  disabled={isLoading}
                   {...form.register("email")}
                 />
                 {form.formState.errors?.email && (
@@ -137,6 +140,36 @@ export function SignUpForm({ className, ...props }: UserAuthFormProps) {
                     {form.formState.errors.email.message}
                   </p>
                 )}
+                </div>
+                <div className="grid gap-1">
+                <Label htmlFor="sex">
+                  Gender
+                </Label>
+                <Select 
+                  value={form.watch('sex')} 
+                  onValueChange={(value) => {
+                    form.setValue('sex', value as "male" | "female");
+                    form.trigger('sex');
+                  }}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select gender" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="male">Male</SelectItem>
+                    <SelectItem value="female">Female</SelectItem>
+                  </SelectContent>
+                </Select>
+                <input
+                  type="hidden"
+                  {...form.register("sex")}
+                />
+                {form.formState.errors?.sex && (
+                  <p className="px-1 text-xs text-red-600">
+                    {form.formState.errors.sex.message}
+                  </p>
+                )}
+                </div>
               </div>
             </div>
             <button className={cn(buttonVariants())} disabled={isLoading}>
@@ -147,31 +180,6 @@ export function SignUpForm({ className, ...props }: UserAuthFormProps) {
             </button>
           </div>
         </form>
-        <div className="relative">
-          <div className="absolute inset-0 flex items-center">
-            <span className="w-full border-t" />
-          </div>
-          <div className="relative flex justify-center text-xs uppercase">
-            <span className="bg-background px-2 text-muted-foreground">
-              Or continue with
-            </span>
-          </div>
-        </div>
-        <button
-          type="button"
-          className={cn(buttonVariants({ variant: "outline" }))}
-          onClick={() => {
-            setIsGitHubLoading(true);
-            signIn("github");
-          }}
-          disabled={isLoading || isGitHubLoading}
-        >
-          {isGitHubLoading ? (
-            <Icons.spinner className="mr-2 h-4 w-4 animate-spin" />
-          ) : (
-            "GitHub"
-          )}
-        </button>
       </Form>
     </div>
   );
